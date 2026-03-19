@@ -1,13 +1,15 @@
 import { useDroppable } from '@dnd-kit/core';
 import type { Lesson } from '../types';
-import DraggableLessonCard from './DraggableLessonCard';
+import AdminLessonCard from './AdminLessonCard';
 
 interface DroppableCellProps {
   dayOfWeek: number;
   timeSlot: number;
   lesson: Lesson | null;
   isConflict: boolean;
-  onEdit?: (lesson: Lesson) => void;
+  onEdit: (lesson: Lesson) => void;
+  onDelete: (lesson: Lesson) => void;
+  onEmptyClick: (dayOfWeek: number, timeSlot: number) => void;
 }
 
 export default function DroppableCell({
@@ -16,6 +18,8 @@ export default function DroppableCell({
   lesson,
   isConflict,
   onEdit,
+  onDelete,
+  onEmptyClick,
 }: DroppableCellProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `cell-${dayOfWeek}-${timeSlot}`,
@@ -30,11 +34,18 @@ export default function DroppableCell({
       }`}
     >
       {lesson ? (
-        <div onDoubleClick={() => onEdit?.(lesson)}>
-          <DraggableLessonCard lesson={lesson} />
-        </div>
+        <AdminLessonCard
+          lesson={lesson}
+          onEdit={() => onEdit(lesson)}
+          onDelete={() => onDelete(lesson)}
+        />
       ) : (
-        <div className="h-16 bg-gray-50/50 rounded min-h-[60px]" />
+        <div
+          onClick={() => onEmptyClick(dayOfWeek, timeSlot)}
+          className="h-16 bg-gray-50/50 rounded min-h-[60px] cursor-pointer hover:bg-primary-50 transition-colors flex items-center justify-center text-gray-400 hover:text-primary-500 text-xs"
+        >
+          +
+        </div>
       )}
     </td>
   );

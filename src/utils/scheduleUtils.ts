@@ -17,6 +17,10 @@ export function getGroupName(id: string) {
   return groups.find((g) => g.id === id)?.name ?? '';
 }
 
+export function getGroupCourse(id: string): number {
+  return groups.find((g) => g.id === id)?.course ?? 1;
+}
+
 export function getLessonTypeLabel(type: string) {
   const map: Record<string, string> = {
     lecture: 'Лекция',

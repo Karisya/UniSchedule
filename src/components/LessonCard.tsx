@@ -12,9 +12,10 @@ interface LessonCardProps {
   lesson: Lesson;
   showProgress?: boolean;
   compact?: boolean;
+  showGroupInfo?: string;
 }
 
-export default function LessonCard({ lesson, showProgress = false, compact = false }: LessonCardProps) {
+export default function LessonCard({ lesson, showProgress = false, compact = false, showGroupInfo }: LessonCardProps) {
   const colors = getLessonTypeColors(lesson.type);
 
   return (
@@ -34,6 +35,9 @@ export default function LessonCard({ lesson, showProgress = false, compact = fal
           {getAuditoriumName(lesson.auditoriumId)}
         </p>
       </div>
+      {showGroupInfo && (
+        <p className="text-xs text-gray-600 mt-1 truncate">{showGroupInfo}</p>
+      )}
       <p className={`flex items-center gap-1.5 mt-2 ${colors.text} font-medium`}>
         <BookOpen className="w-3.5 h-3.5 flex-shrink-0" />
         {getLessonTypeLabel(lesson.type)}

@@ -40,6 +40,15 @@ export interface Lesson {
 export interface Group {
   id: string;
   name: string;
+  course: number; // 1-4 курс
+}
+
+export interface DbUser {
+  email: string;
+  password: string;
+  role: UserRole;
+  groupId?: string;
+  teacherId?: string;
 }
 
 export const TIME_SLOTS = [

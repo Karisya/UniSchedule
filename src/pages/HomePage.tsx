@@ -1,11 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { GraduationCap, BookOpen, Settings } from 'lucide-react';
-import { useAppDispatch } from '../store/hooks';
-import { loginAs } from '../store/userSlice';
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
 
   const roles = [
     {
@@ -55,12 +52,7 @@ export default function HomePage() {
             return (
               <button
                 key={role.id}
-                onClick={() => {
-                  if (role.id === 'student') dispatch(loginAs({ role: 'student', groupId: '1' }));
-                  else if (role.id === 'teacher') dispatch(loginAs({ role: 'teacher', teacherId: '1' }));
-                  else dispatch(loginAs({ role: 'administrator' }));
-                  navigate(role.path);
-                }}
+                onClick={() => navigate(`/login/${role.id}`)}
                 className="w-72 p-6 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all text-left group"
               >
                 <div className="flex flex-col items-center">

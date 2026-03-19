@@ -1,4 +1,4 @@
-import type { Lesson, Teacher, Subject, Auditorium, Group } from '../types';
+import type { Lesson, Teacher, Subject, Auditorium, Group, DbUser } from '../types';
 
 export const teachers: Teacher[] = [
   { id: '1', name: 'Иванов А.П.' },
@@ -31,9 +31,15 @@ export const auditoriums: Auditorium[] = [
 ];
 
 export const groups: Group[] = [
-  { id: '1', name: 'ИВТ-201' },
-  { id: '2', name: 'ИВТ-202' },
-  { id: '3', name: 'ПИ-201' },
+  { id: '1', name: 'ИВТ-201', course: 2 },
+  { id: '2', name: 'ИВТ-202', course: 2 },
+  { id: '3', name: 'ПИ-201', course: 2 },
+];
+
+export const users: DbUser[] = [
+  { email: 'student@uni.ru', password: 'student', role: 'student', groupId: '1' },
+  { email: 'teacher@uni.ru', password: 'teacher', role: 'teacher', teacherId: '1' },
+  { email: 'admin@uni.ru', password: 'admin', role: 'administrator' },
 ];
 
 export const initialLessons: Lesson[] = [
