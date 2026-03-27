@@ -319,21 +319,38 @@ export default function AdminSchedule() {
 
   const handleModalSubmit = (data: LessonFormData) => {
     const extraInfo = data.extraInfo?.trim() || undefined;
-    const lessonPayload = { ...data, extraInfo };
+    const { groupIds, ...rest } = data;
     const weekKeyForNew = prefilledSlot?.weekStartKey ?? viewWeekStartKey;
     if (editingLessonId) {
       const lesson = lessons.find((l) => l.id === editingLessonId);
-      if (lesson) dispatch(updateLesson({ ...lesson, ...lessonPayload }));
+      if (lesson) {
+        dispatch(
+          updateLesson({
+            ...lesson,
+            ...rest,
+            groupId: groupIds[0],
+            extraInfo,
+          }),
+        );
+      }
     } else {
-      const payload = prefilledSlot
-        ? {
-            ...lessonPayload,
-            dayOfWeek: prefilledSlot.dayOfWeek,
-            timeSlot: prefilledSlot.timeSlot,
+      const dayOfWeek = prefilledSlot ? prefilledSlot.dayOfWeek : rest.dayOfWeek;
+      const timeSlot = prefilledSlot ? prefilledSlot.timeSlot : rest.timeSlot;
+      for (const gid of groupIds) {
+        dispatch(
+          addLesson({
+            subjectId: rest.subjectId,
+            teacherId: rest.teacherId,
+            auditoriumId: rest.auditoriumId,
+            groupId: gid,
+            type: rest.type,
+            dayOfWeek,
+            timeSlot,
             weekStartKey: weekKeyForNew,
-          }
-        : { ...lessonPayload, weekStartKey: viewWeekStartKey };
-      dispatch(addLesson(payload));
+            extraInfo,
+          }),
+        );
+      }
     }
     setModalOpen(false);
     setPrefilledSlot(null);
@@ -764,13 +781,15 @@ export default function AdminSchedule() {
           isOpen={modalOpen}
           onClose={() => { setModalOpen(false); setPrefilledSlot(null); }}
           onSubmit={handleModalSubmit}
+          availableGroups={groupsForCourse}
+          allowMultipleGroups={!editingLessonId}
           initialData={
             editingLesson
               ? {
                   subjectId: editingLesson.subjectId,
                   teacherId: editingLesson.teacherId,
                   auditoriumId: editingLesson.auditoriumId,
-                  groupId: editingLesson.groupId,
+                  groupIds: [editingLesson.groupId],
                   type: editingLesson.type,
                   dayOfWeek: editingLesson.dayOfWeek,
                   timeSlot: editingLesson.timeSlot,
@@ -780,10 +799,10 @@ export default function AdminSchedule() {
               ? {
                   dayOfWeek: prefilledSlot.dayOfWeek,
                   timeSlot: prefilledSlot.timeSlot,
-                  groupId: filterGroup,
+                  groupIds: [filterGroup],
                 }
               : filtersReady
-              ? { groupId: filterGroup }
+              ? { groupIds: [filterGroup] }
               : undefined
           }
           conflicts={editingLesson ? conflictsForModal : { room: false, teacher: false }}

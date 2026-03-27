@@ -2,13 +2,14 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod/v3';
-import { subjects, teachers, auditoriums, groups } from '../store/mockData';
+import { subjects, teachers, auditoriums } from '../store/mockData';
+import type { Group } from '../types';
 
 const schema = z.object({
   subjectId: z.string().min(1, 'Выберите предмет'),
   teacherId: z.string().min(1, 'Выберите преподавателя'),
   auditoriumId: z.string().min(1, 'Выберите аудиторию'),
-  groupId: z.string().min(1, 'Выберите группу'),
+  groupIds: z.array(z.string()).min(1, 'Выберите хотя бы одну группу'),
   type: z.enum(['lecture', 'practice', 'laboratory']),
   dayOfWeek: z.number().min(0).max(5),
   timeSlot: z.number().min(0).max(5),
@@ -23,6 +24,10 @@ interface LessonModalProps {
   onSubmit: (data: LessonFormData) => void;
   initialData?: Partial<LessonFormData>;
   conflicts?: { room: boolean; teacher: boolean };
+  /** Группы того же курса, что выбран в фильтре админки */
+  availableGroups: Group[];
+  /** При создании — несколько групп; при редактировании — одна */
+  allowMultipleGroups: boolean;
 }
 
 export default function LessonModal({
@@ -31,44 +36,72 @@ export default function LessonModal({
   onSubmit,
   initialData,
   conflicts = { room: false, teacher: false },
+  availableGroups,
+  allowMultipleGroups,
 }: LessonModalProps) {
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<LessonFormData>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      subjectId: '',
-      teacherId: '',
-      auditoriumId: '',
-      groupId: '',
-      type: 'lecture',
-      dayOfWeek: 0,
-      timeSlot: 0,
-      extraInfo: '',
-    },
-  });
+  const { register, handleSubmit, formState: { errors }, reset, watch, setValue, getValues } =
+    useForm<LessonFormData>({
+      resolver: zodResolver(schema),
+      defaultValues: {
+        subjectId: '',
+        teacherId: '',
+        auditoriumId: '',
+        groupIds: [],
+        type: 'lecture',
+        dayOfWeek: 0,
+        timeSlot: 0,
+        extraInfo: '',
+      },
+    });
+
+  const selectedGroupIds = watch('groupIds');
 
   useEffect(() => {
     if (isOpen) {
+      const defaultGroupIds =
+        initialData?.groupIds && initialData.groupIds.length > 0
+          ? initialData.groupIds
+          : availableGroups[0]
+            ? [availableGroups[0].id]
+            : [];
       reset({
         subjectId: initialData?.subjectId ?? '',
         teacherId: initialData?.teacherId ?? '',
         auditoriumId: initialData?.auditoriumId ?? '',
-        groupId: initialData?.groupId ?? '1',
+        groupIds: defaultGroupIds,
         type: (initialData?.type as 'lecture' | 'practice' | 'laboratory') ?? 'lecture',
         dayOfWeek: initialData?.dayOfWeek ?? 0,
         timeSlot: initialData?.timeSlot ?? 0,
         extraInfo: initialData?.extraInfo ?? '',
       });
     }
-  }, [isOpen, initialData, reset]);
+  }, [isOpen, initialData, reset, availableGroups]);
+
+  const toggleGroupId = (id: string, checked: boolean) => {
+    const cur = getValues('groupIds');
+    if (checked) {
+      if (!cur.includes(id)) setValue('groupIds', [...cur, id], { shouldValidate: true });
+    } else {
+      setValue(
+        'groupIds',
+        cur.filter((g) => g !== id),
+        { shouldValidate: true },
+      );
+    }
+  };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+      <div
+        className={`relative bg-white rounded-xl shadow-xl w-full mx-4 p-6 ${
+          allowMultipleGroups ? 'max-w-lg' : 'max-w-md'
+        }`}
+      >
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          {initialData ? 'Редактировать занятие' : 'Добавить занятие'}
+          {allowMultipleGroups ? 'Добавить занятие' : 'Редактировать занятие'}
         </h2>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -142,19 +175,63 @@ export default function LessonModal({
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Группа</label>
-            <select
-              {...register('groupId')}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            >
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {allowMultipleGroups ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Применить к нескольким группам
+              </label>
+              <p className="text-xs text-gray-500 mb-2 leading-snug">
+                Одинаковое занятие будет создано для каждой отмеченной группы курса — без повторного ввода
+                предмета, преподавателя и времени.
+              </p>
+              <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-200 p-2 space-y-1.5">
+                {availableGroups.length === 0 ? (
+                  <p className="text-sm text-gray-500">Нет групп для выбранного курса</p>
+                ) : (
+                  availableGroups.map((g) => (
+                    <label
+                      key={g.id}
+                      className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 rounded px-2 py-1"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedGroupIds.includes(g.id)}
+                        onChange={(e) => toggleGroupId(g.id, e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                      <span>
+                        {g.name}{' '}
+                        <span className="text-gray-500">({g.course} курс)</span>
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
+              {errors.groupIds && (
+                <p className="text-red-500 text-xs mt-1">{errors.groupIds.message}</p>
+              )}
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Группа</label>
+              <select
+                value={selectedGroupIds[0] ?? ''}
+                onChange={(e) =>
+                  setValue('groupIds', e.target.value ? [e.target.value] : [], { shouldValidate: true })
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                {availableGroups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} ({g.course} курс)
+                  </option>
+                ))}
+              </select>
+              {errors.groupIds && (
+                <p className="text-red-500 text-xs mt-1">{errors.groupIds.message}</p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Тип занятия</label>
