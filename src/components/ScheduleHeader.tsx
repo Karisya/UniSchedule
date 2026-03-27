@@ -8,9 +8,12 @@ interface ScheduleHeaderProps {
   userGroup?: string;
   onPrevWeek?: () => void;
   onNextWeek?: () => void;
-  onToday?: () => void;
   onCurrentWeek?: () => void;
   showNav?: boolean;
+  /** true, если на экране календарная текущая неделя */
+  isCurrentWeek?: boolean;
+  /** Диапазон дат просматриваемой недели (показывается в центре при листании) */
+  weekRangeLabel?: string;
 }
 
 export default function ScheduleHeader({
@@ -20,9 +23,10 @@ export default function ScheduleHeader({
   userGroup,
   onPrevWeek,
   onNextWeek,
-  onToday,
   onCurrentWeek,
   showNav = false,
+  isCurrentWeek = true,
+  weekRangeLabel = '',
 }: ScheduleHeaderProps) {
   const navigate = useNavigate();
 
@@ -48,20 +52,32 @@ export default function ScheduleHeader({
         {showNav && (
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={onPrevWeek}
-              className="w-8 h-8 rounded-md border border-gray-300 flex items-center justify-center hover:bg-gray-50"
+              className="w-9 h-9 rounded-md border border-gray-300 flex items-center justify-center hover:bg-gray-50"
+              aria-label="Предыдущая неделя"
             >
               ←
             </button>
+            {isCurrentWeek ? (
+              <span className="px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 rounded-md border border-primary-200 min-w-[9rem] text-center">
+                Текущая неделя
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={onCurrentWeek}
+                className="px-3 py-1.5 text-sm font-medium text-primary-800 bg-white rounded-md hover:bg-primary-50 border border-primary-200 max-w-[240px] truncate"
+                title="Вернуться к текущей неделе"
+              >
+                {weekRangeLabel || '…'}
+              </button>
+            )}
             <button
-              onClick={onToday}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-            >
-              Сегодня
-            </button>
-            <button
+              type="button"
               onClick={onNextWeek}
-              className="w-8 h-8 rounded-md border border-gray-300 flex items-center justify-center hover:bg-gray-50"
+              className="w-9 h-9 rounded-md border border-gray-300 flex items-center justify-center hover:bg-gray-50"
+              aria-label="Следующая неделя"
             >
               →
             </button>
@@ -77,19 +93,7 @@ export default function ScheduleHeader({
 
       <div className="mt-4">
         <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-        {subtitle && (
-          <div className="flex items-center gap-3 mt-2">
-            <p className="text-gray-600">{subtitle}</p>
-            {onCurrentWeek && (
-              <button
-                onClick={onCurrentWeek}
-                className="px-3 py-1.5 text-sm font-medium text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100"
-              >
-                Текущая неделя
-              </button>
-            )}
-          </div>
-        )}
+        {subtitle && <p className="text-gray-600 mt-2">{subtitle}</p>}
       </div>
     </header>
   );

@@ -10,6 +10,8 @@ interface DroppableCellProps {
   onEdit: (lesson: Lesson) => void;
   onDelete: (lesson: Lesson) => void;
   onEmptyClick: (dayOfWeek: number, timeSlot: number) => void;
+  /** false — ячейка «+» не активна (нет выбора курса/группы) */
+  scheduleReady?: boolean;
 }
 
 export default function DroppableCell({
@@ -20,6 +22,7 @@ export default function DroppableCell({
   onEdit,
   onDelete,
   onEmptyClick,
+  scheduleReady = true,
 }: DroppableCellProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `cell-${dayOfWeek}-${timeSlot}`,
@@ -41,8 +44,12 @@ export default function DroppableCell({
         />
       ) : (
         <div
-          onClick={() => onEmptyClick(dayOfWeek, timeSlot)}
-          className="h-16 bg-gray-50/50 rounded min-h-[60px] cursor-pointer hover:bg-primary-50 transition-colors flex items-center justify-center text-gray-400 hover:text-primary-500 text-xs"
+          onClick={() => scheduleReady && onEmptyClick(dayOfWeek, timeSlot)}
+          className={`h-16 rounded min-h-[60px] flex items-center justify-center text-xs transition-colors ${
+            scheduleReady
+              ? 'bg-gray-50/50 cursor-pointer hover:bg-primary-50 text-gray-400 hover:text-primary-500'
+              : 'bg-gray-100 cursor-not-allowed text-gray-300'
+          }`}
         >
           +
         </div>

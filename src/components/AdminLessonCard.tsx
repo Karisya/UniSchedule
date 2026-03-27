@@ -26,8 +26,16 @@ export default function AdminLessonCard({ lesson, onEdit, onDelete }: AdminLesso
       style={style}
       className={`relative group/card ${isDragging ? 'opacity-50 z-50' : ''}`}
     >
-      <div {...listeners} {...attributes} className="cursor-grab active:cursor-grabbing" onClick={(e) => { if (!(e.target as HTMLElement).closest('button')) onEdit(e); }}>
-        <LessonCard lesson={lesson} compact showGroupInfo={groupInfo} />
+      <div
+        {...listeners}
+        {...attributes}
+        className="cursor-grab active:cursor-grabbing"
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest('button')) return;
+          onEdit(e);
+        }}
+      >
+        <LessonCard lesson={lesson} compact showGroupInfo={groupInfo} showStaffRoomDetails />
       </div>
       <div
         className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity z-10"

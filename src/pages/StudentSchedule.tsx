@@ -3,8 +3,15 @@ import { useAppSelector } from '../store/hooks';
 import ScheduleHeader from '../components/ScheduleHeader';
 import LessonCard from '../components/LessonCard';
 import { TIME_SLOTS, DAYS_OF_WEEK } from '../types';
-import { getWeekRange, formatDateRange, getGroupName } from '../utils/scheduleUtils';
+import { getWeekRange, formatDateRange, getGroupName, getWeekDayDates } from '../utils/scheduleUtils';
+import { dateToWeekStartKey } from '../utils/weekKeys';
 import { Filter } from 'lucide-react';
+
+function getTodayWeekdayIndex(): number {
+  const day = new Date().getDay();
+  if (day === 0 || day === 6) return -1;
+  return day - 1;
+}
 
 export default function StudentSchedule() {
   const user = useAppSelector((s) => s.user.current);
@@ -19,20 +26,27 @@ export default function StudentSchedule() {
     return d;
   }, [weekOffset]);
 
-  const { start, end } = useMemo(() => getWeekRange(currentDate), [currentDate]);
+  const { start } = useMemo(() => getWeekRange(currentDate), [currentDate]);
+  const viewWeekStartKey = useMemo(() => dateToWeekStartKey(start), [start]);
+  const end = useMemo(() => {
+    const e = new Date(start);
+    e.setDate(e.getDate() + 4);
+    return e;
+  }, [start]);
   const dateRangeStr = formatDateRange(start, end);
+  const weekDates = useMemo(() => getWeekDayDates(start), [start]);
 
   const filteredLessons = useMemo(() => {
     return lessons.filter(
-      (l) => l.groupId === groupId && filterTypes.has(l.type)
+      (l) =>
+        l.groupId === groupId &&
+        filterTypes.has(l.type) &&
+        l.weekStartKey === viewWeekStartKey
     );
-  }, [lessons, groupId, filterTypes]);
+  }, [lessons, groupId, filterTypes, viewWeekStartKey]);
 
-  const todayDayOfWeek = useMemo(() => {
-    const d = new Date();
-    const day = d.getDay();
-    return day === 0 ? 5 : day - 1;
-  }, []);
+  const todayIdx = getTodayWeekdayIndex();
+  const isCurrentWeek = weekOffset === 0;
 
   const toggleFilter = (type: string) => {
     setFilterTypes((prev) => {
@@ -54,9 +68,10 @@ export default function StudentSchedule() {
         userRole="Студент"
         userGroup={user?.groupId ? getGroupName(user.groupId) : undefined}
         showNav
+        isCurrentWeek={isCurrentWeek}
+        weekRangeLabel={dateRangeStr}
         onPrevWeek={() => setWeekOffset((o) => o - 1)}
         onNextWeek={() => setWeekOffset((o) => o + 1)}
-        onToday={() => setWeekOffset(0)}
         onCurrentWeek={() => setWeekOffset(0)}
       />
 
@@ -91,16 +106,23 @@ export default function StudentSchedule() {
                 <th className="w-28 p-2 text-left text-sm font-medium text-gray-600 border-b border-r border-gray-200 bg-gray-50">
                   Время
                 </th>
-                {DAYS_OF_WEEK.slice(0, 5).map((day, i) => (
-                  <th
-                    key={day}
-                    className={`p-2 text-center text-sm font-medium border-b border-gray-200 ${
-                      i === todayDayOfWeek && weekOffset === 0 ? 'bg-primary-50 text-primary-700' : 'bg-gray-50 text-gray-600'
-                    }`}
-                  >
-                    {day}
-                  </th>
-                ))}
+                {DAYS_OF_WEEK.slice(0, 5).map((day, i) => {
+                  const d = weekDates[i];
+                  const isTodayCol = isCurrentWeek && todayIdx === i;
+                  return (
+                    <th
+                      key={day}
+                      className={`p-2 text-center text-sm font-medium border-b border-gray-200 ${
+                        isTodayCol ? 'bg-primary-100 text-primary-800 ring-2 ring-primary-300 ring-inset' : 'bg-gray-50 text-gray-600'
+                      }`}
+                    >
+                      <div>{day}</div>
+                      <div className="text-xs font-normal opacity-80 mt-0.5">
+                        {d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
@@ -111,12 +133,12 @@ export default function StudentSchedule() {
                   </td>
                   {DAYS_OF_WEEK.slice(0, 5).map((_, dayIdx) => {
                     const lesson = getLessonAt(dayIdx, slotIdx);
-                    const isToday = dayIdx === todayDayOfWeek && weekOffset === 0;
+                    const isTodayCol = isCurrentWeek && todayIdx === dayIdx;
                     return (
                       <td
                         key={dayIdx}
                         className={`p-2 border-b border-gray-200 align-top min-w-[140px] ${
-                          isToday ? 'bg-primary-50/50' : ''
+                          isTodayCol ? 'bg-primary-50/70' : ''
                         }`}
                       >
                         {lesson ? (

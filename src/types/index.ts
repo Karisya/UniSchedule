@@ -23,6 +23,12 @@ export interface Subject {
 export interface Auditorium {
   id: string;
   name: string;
+  /** Компактный / небольшой зал */
+  compact?: boolean;
+  /** Есть проектор */
+  hasProjector?: boolean;
+  /** Интерактивная доска */
+  hasInteractiveBoard?: boolean;
 }
 
 export interface Lesson {
@@ -34,7 +40,11 @@ export interface Lesson {
   type: LessonType;
   dayOfWeek: number; // 0 = Monday
   timeSlot: number; // 0-5
+  /** Понедельник недели, к которой относится занятие (YYYY-MM-DD, локальное) */
+  weekStartKey: string;
   progress?: number; // 0-100 для преподавателя
+  /** Доп. заметка (только преподаватель / администратор), из модалки */
+  extraInfo?: string;
 }
 
 export interface Group {

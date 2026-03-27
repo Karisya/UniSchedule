@@ -25,7 +25,7 @@ export default function DraggableLessonCard({ lesson }: DraggableLessonCardProps
       {...attributes}
       className={`cursor-grab active:cursor-grabbing ${isDragging ? 'opacity-50 z-50' : ''}`}
     >
-      <LessonCard lesson={lesson} compact />
+      <LessonCard lesson={lesson} compact showStaffRoomDetails />
     </div>
   );
 }

@@ -6,40 +6,62 @@ import { TIME_SLOTS, DAYS_OF_WEEK } from '../types';
 import {
   getWeekRange,
   formatDateRange,
+  getWeekDayDates,
   getSubjectName,
-  getTeacherName,
   getAuditoriumName,
   getLessonTypeLabel,
+  getGroupCourse,
+  getGroupName,
+  getAuditoriumDetailLine,
 } from '../utils/scheduleUtils';
+import { groups } from '../store/mockData';
+import { dateToWeekStartKey } from '../utils/weekKeys';
 import { Filter } from 'lucide-react';
 
+function getTodayWeekdayIndex(): number {
+  const day = new Date().getDay();
+  if (day === 0 || day === 6) return -1;
+  return day - 1;
+}
+
 export default function TeacherSchedule() {
+  const user = useAppSelector((s) => s.user.current);
   const lessons = useAppSelector((s) => s.schedule.lessons);
   const [weekOffset, setWeekOffset] = useState(0);
-  const [filterGroup, setFilterGroup] = useState<string>('1');
+  const [filterCourse, setFilterCourse] = useState<string>('all');
   const [filterTypes, setFilterTypes] = useState<Set<string>>(new Set(['lecture', 'practice', 'laboratory']));
 
-  const teacherId = '1';
+  const teacherId = user?.teacherId ?? '1';
+
   const currentDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + weekOffset * 7);
     return d;
   }, [weekOffset]);
 
-  const { start, end } = useMemo(() => getWeekRange(currentDate), [currentDate]);
+  const { start } = useMemo(() => getWeekRange(currentDate), [currentDate]);
+  const viewWeekStartKey = useMemo(() => dateToWeekStartKey(start), [start]);
+  const end = useMemo(() => {
+    const e = new Date(start);
+    e.setDate(e.getDate() + 4);
+    return e;
+  }, [start]);
   const dateRangeStr = formatDateRange(start, end);
+  const weekDates = useMemo(() => getWeekDayDates(start), [start]);
 
   const filteredLessons = useMemo(() => {
-    return lessons.filter(
-      (l) => l.teacherId === teacherId && l.groupId === filterGroup && filterTypes.has(l.type)
-    );
-  }, [lessons, teacherId, filterGroup, filterTypes]);
+    return lessons.filter((l) => {
+      if (l.teacherId !== teacherId) return false;
+      if (!filterTypes.has(l.type)) return false;
+      if (l.weekStartKey !== viewWeekStartKey) return false;
+      const g = groups.find((gr) => gr.id === l.groupId);
+      if (filterCourse !== 'all' && g?.course !== parseInt(filterCourse, 10)) return false;
+      return true;
+    });
+  }, [lessons, teacherId, filterCourse, filterTypes, viewWeekStartKey]);
 
-  const todayDayOfWeek = useMemo(() => {
-    const d = new Date();
-    const day = d.getDay();
-    return day === 0 ? 5 : day - 1;
-  }, []);
+  const todayIdx = getTodayWeekdayIndex();
+  const isCurrentWeek = weekOffset === 0;
 
   const toggleFilter = (type: string) => {
     setFilterTypes((prev) => {
@@ -53,17 +75,21 @@ export default function TeacherSchedule() {
   const getLessonAt = (day: number, slot: number) =>
     filteredLessons.find((l) => l.dayOfWeek === day && l.timeSlot === slot);
 
+  const headerCourseLabel =
+    filterCourse === 'all' ? 'все курсы' : `${filterCourse} курс`;
+
   return (
     <div className="min-h-screen">
       <ScheduleHeader
         title="Расписание"
         subtitle={dateRangeStr}
         userRole="Преподаватель"
-        userGroup="ИВТ-201"
+        userGroup={headerCourseLabel}
         showNav
+        isCurrentWeek={isCurrentWeek}
+        weekRangeLabel={dateRangeStr}
         onPrevWeek={() => setWeekOffset((o) => o - 1)}
         onNextWeek={() => setWeekOffset((o) => o + 1)}
-        onToday={() => setWeekOffset(0)}
         onCurrentWeek={() => setWeekOffset(0)}
       />
 
@@ -71,15 +97,18 @@ export default function TeacherSchedule() {
         <div className="flex items-center gap-6 mb-4 flex-wrap">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-gray-500" />
-            <span className="text-sm text-gray-600">Группа:</span>
+            <span className="text-sm text-gray-600">Курс:</span>
             <select
-              value={filterGroup}
-              onChange={(e) => setFilterGroup(e.target.value)}
+              value={filterCourse}
+              onChange={(e) => setFilterCourse(e.target.value)}
               className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
             >
-              <option value="1">ИВТ-201</option>
-              <option value="2">ИВТ-202</option>
-              <option value="3">ПИ-201</option>
+              <option value="all">Все курсы</option>
+              {[1, 2, 3, 4].map((c) => (
+                <option key={c} value={String(c)}>
+                  {c} курс
+                </option>
+              ))}
             </select>
           </div>
           <div className="flex items-center gap-4">
@@ -109,16 +138,23 @@ export default function TeacherSchedule() {
                 <th className="w-28 p-2 text-left text-sm font-medium text-gray-600 border-b border-r border-gray-200 bg-gray-50">
                   Время
                 </th>
-                {DAYS_OF_WEEK.slice(0, 5).map((day, i) => (
-                  <th
-                    key={day}
-                    className={`p-2 text-center text-sm font-medium border-b border-gray-200 ${
-                      i === todayDayOfWeek && weekOffset === 0 ? 'bg-primary-50 text-primary-700' : 'bg-gray-50 text-gray-600'
-                    }`}
-                  >
-                    {day}
-                  </th>
-                ))}
+                {DAYS_OF_WEEK.slice(0, 5).map((day, i) => {
+                  const d = weekDates[i];
+                  const isTodayCol = isCurrentWeek && todayIdx === i;
+                  return (
+                    <th
+                      key={day}
+                      className={`p-2 text-center text-sm font-medium border-b border-gray-200 ${
+                        isTodayCol ? 'bg-primary-100 text-primary-800 ring-2 ring-primary-300 ring-inset' : 'bg-gray-50 text-gray-600'
+                      }`}
+                    >
+                      <div>{day}</div>
+                      <div className="text-xs font-normal opacity-80 mt-0.5">
+                        {d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
@@ -129,20 +165,19 @@ export default function TeacherSchedule() {
                   </td>
                   {DAYS_OF_WEEK.slice(0, 5).map((_, dayIdx) => {
                     const lesson = getLessonAt(dayIdx, slotIdx);
-                    const isToday = dayIdx === todayDayOfWeek && weekOffset === 0;
+                    const isTodayCol = isCurrentWeek && todayIdx === dayIdx;
                     return (
                       <td
                         key={dayIdx}
                         className={`p-2 border-b border-gray-200 align-top min-w-[140px] ${
-                          isToday ? 'bg-primary-50/50' : ''
+                          isTodayCol ? 'bg-primary-50/70' : ''
                         }`}
                       >
                         {lesson ? (
                           <div
-                            title={`${getSubjectName(lesson.subjectId)}\nПреподаватель: ${getTeacherName(lesson.teacherId)}\nАудитория: ${getAuditoriumName(lesson.auditoriumId)}\nТип: ${getLessonTypeLabel(lesson.type)}\nПрогресс: ${lesson.progress ?? 0}%`}
-                            className="cursor-help"
+                            title={`${getGroupCourse(lesson.groupId)} курс, ${getGroupName(lesson.groupId)}\n${getSubjectName(lesson.subjectId)}\n${getAuditoriumName(lesson.auditoriumId)} — ${getAuditoriumDetailLine(lesson.auditoriumId)}\n${getLessonTypeLabel(lesson.type)}`}
                           >
-                            <LessonCard lesson={lesson} showProgress />
+                            <LessonCard lesson={lesson} showProgress teacherMode />
                           </div>
                         ) : (
                           <div className="h-20 bg-gray-50/50 rounded" />

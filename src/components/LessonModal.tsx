@@ -12,6 +12,7 @@ const schema = z.object({
   type: z.enum(['lecture', 'practice', 'laboratory']),
   dayOfWeek: z.number().min(0).max(5),
   timeSlot: z.number().min(0).max(5),
+  extraInfo: z.string().max(2000, 'Не более 2000 символов').optional(),
 });
 
 export type LessonFormData = z.infer<typeof schema>;
@@ -41,6 +42,7 @@ export default function LessonModal({
       type: 'lecture',
       dayOfWeek: 0,
       timeSlot: 0,
+      extraInfo: '',
     },
   });
 
@@ -54,6 +56,7 @@ export default function LessonModal({
         type: (initialData?.type as 'lecture' | 'practice' | 'laboratory') ?? 'lecture',
         dayOfWeek: initialData?.dayOfWeek ?? 0,
         timeSlot: initialData?.timeSlot ?? 0,
+        extraInfo: initialData?.extraInfo ?? '',
       });
     }
   }, [isOpen, initialData, reset]);
@@ -124,6 +127,18 @@ export default function LessonModal({
             </select>
             {conflicts.room && (
               <p className="text-red-500 text-xs mt-1">Конфликт: аудитория занята</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Доп. информация</label>
+            <textarea
+              {...register('extraInfo')}
+              rows={3}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-y min-h-[4.5rem]"
+            />
+            {errors.extraInfo && (
+              <p className="text-red-500 text-xs mt-1">{errors.extraInfo.message}</p>
             )}
           </div>
 
