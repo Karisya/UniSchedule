@@ -9,6 +9,7 @@ import {
   getGroupName,
   getGroupCourse,
   getLessonProgressPercent,
+  getLessonProgressInfo,
 } from '../utils/scheduleUtils';
 import type { Lesson } from '../types';
 
@@ -21,6 +22,8 @@ interface LessonCardProps {
   teacherMode?: boolean;
   /** Справочные детали аудитории и поле «Доп. информация» — только преподаватель / администратор */
   showStaffRoomDetails?: boolean;
+  /** Для расчёта «факт / план» по индивидуальному плану преподавателя (все занятия из store). */
+  progressLessons?: Lesson[];
 }
 
 export default function LessonCard({
@@ -30,17 +33,20 @@ export default function LessonCard({
   showGroupInfo,
   teacherMode = false,
   showStaffRoomDetails,
+  progressLessons,
 }: LessonCardProps) {
   const colors = getLessonTypeColors(lesson.type);
   const courseGroupLine = `${getGroupCourse(lesson.groupId)} курс · ${getGroupName(lesson.groupId)}`;
-  const roomExtrasVisible = showStaffRoomDetails ?? teacherMode;
-  const audDetails = roomExtrasVisible ? getAuditoriumDetailLine(lesson.auditoriumId) : '';
-  const extraInfoTrimmed = roomExtrasVisible ? lesson.extraInfo?.trim() : '';
-  const progressPct = getLessonProgressPercent(lesson);
+  const showAuditoriumMeta = showStaffRoomDetails ?? teacherMode;
+  const audDetails = showAuditoriumMeta ? getAuditoriumDetailLine(lesson.auditoriumId) : '';
+  const extraInfoTrimmed = lesson.extraInfo?.trim() ?? '';
+  const progressInfo =
+    showProgress && progressLessons?.length ? getLessonProgressInfo(lesson, progressLessons) : null;
+  const progressPct = getLessonProgressPercent(lesson, progressLessons);
 
   return (
     <div
-      className={`rounded-lg p-3 ${colors.bg} ${colors.text} border border-white/50 ${
+      className={`rounded-lg p-3 min-w-0 ${colors.bg} ${colors.text} border border-white/50 ${
         compact ? 'text-xs' : 'text-sm'
       }`}
     >
@@ -69,9 +75,12 @@ export default function LessonCard({
           <p className="text-[10px] leading-tight opacity-85 pl-[22px]">{audDetails}</p>
         )}
         {extraInfoTrimmed && (
-          <p className="text-[10px] leading-tight opacity-90 pl-[22px] whitespace-pre-wrap break-words">
-            {extraInfoTrimmed}
-          </p>
+          <div className="pl-[22px] mt-1 space-y-0.5">
+            <p className="text-[10px] font-semibold leading-tight opacity-95">Дополнительная информация</p>
+            <p className="text-[10px] leading-tight opacity-90 whitespace-pre-wrap break-words">
+              {extraInfoTrimmed}
+            </p>
+          </div>
         )}
       </div>
 
@@ -85,14 +94,20 @@ export default function LessonCard({
       </p>
       {showProgress && (
         <div className="mt-2">
-          <p className="text-xs mb-1">Прогресс</p>
+          <p className="text-xs mb-1">Прогресс к плану</p>
+          {progressInfo ? (
+            <p className="text-[11px] opacity-90 mb-1 tabular-nums">
+              {progressInfo.scheduledHours} / {progressInfo.plannedHours} акад. ч ({progressInfo.percent}%)
+            </p>
+          ) : progressLessons?.length ? (
+            <p className="text-[11px] opacity-80 mb-1">Для этой строки нет записи в плане часов.</p>
+          ) : null}
           <div className="h-1.5 bg-white/50 rounded-full overflow-hidden">
             <div
               className="h-full bg-current rounded-full transition-all"
               style={{ width: `${progressPct}%` }}
             />
           </div>
-          <p className="text-xs mt-0.5">{progressPct}%</p>
         </div>
       )}
     </div>

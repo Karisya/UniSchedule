@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Calendar } from 'lucide-react';
 
@@ -14,6 +15,10 @@ interface ScheduleHeaderProps {
   isCurrentWeek?: boolean;
   /** Диапазон дат просматриваемой недели (показывается в центре при листании) */
   weekRangeLabel?: string;
+  /** «Нечётная» / «Чёрная» (чётная) — ориентир по лабораторным */
+  academicWeekLine?: string;
+  /** Дополнительная зона под заголовком (например семантический поиск) */
+  toolbar?: ReactNode;
 }
 
 export default function ScheduleHeader({
@@ -27,6 +32,8 @@ export default function ScheduleHeader({
   showNav = false,
   isCurrentWeek = true,
   weekRangeLabel = '',
+  academicWeekLine,
+  toolbar,
 }: ScheduleHeaderProps) {
   const navigate = useNavigate();
 
@@ -94,6 +101,12 @@ export default function ScheduleHeader({
       <div className="mt-4">
         <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
         {subtitle && <p className="text-gray-600 mt-2">{subtitle}</p>}
+        {academicWeekLine && (
+          <p className="text-sm font-medium text-primary-800 mt-2 pl-3 border-l-4 border-primary-400">
+            {academicWeekLine}
+          </p>
+        )}
+        {toolbar && <div className="mt-4">{toolbar}</div>}
       </div>
     </header>
   );

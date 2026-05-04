@@ -24,12 +24,12 @@ export default function AdminLessonCard({ lesson, onEdit, onDelete }: AdminLesso
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative group/card ${isDragging ? 'opacity-50 z-50' : ''}`}
+      className={`relative group/card min-w-0 ${isDragging ? 'opacity-50 z-50' : ''}`}
     >
       <div
         {...listeners}
         {...attributes}
-        className="cursor-grab active:cursor-grabbing"
+        className="cursor-grab active:cursor-grabbing min-w-0"
         onClick={(e) => {
           if ((e.target as HTMLElement).closest('button')) return;
           onEdit(e);

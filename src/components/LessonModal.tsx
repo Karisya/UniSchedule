@@ -1,9 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod/v3';
 import { subjects, teachers, auditoriums } from '../store/mockData';
-import type { Group } from '../types';
+import type { Group, Lesson } from '../types';
+import { TIME_SLOTS } from '../types';
+import { hasConflict } from '../utils/scheduleUtils';
 
 const schema = z.object({
   subjectId: z.string().min(1, 'Выберите предмет'),
@@ -12,7 +14,7 @@ const schema = z.object({
   groupIds: z.array(z.string()).min(1, 'Выберите хотя бы одну группу'),
   type: z.enum(['lecture', 'practice', 'laboratory']),
   dayOfWeek: z.number().min(0).max(5),
-  timeSlot: z.number().min(0).max(5),
+  timeSlot: z.number().min(0).max(6),
   extraInfo: z.string().max(2000, 'Не более 2000 символов').optional(),
 });
 
@@ -23,7 +25,12 @@ interface LessonModalProps {
   onClose: () => void;
   onSubmit: (data: LessonFormData) => void;
   initialData?: Partial<LessonFormData>;
-  conflicts?: { room: boolean; teacher: boolean };
+  /** Все занятия (конфликт: тот же преподаватель или аудитория в той же календарной дате и паре). */
+  lessons: Lesson[];
+  /** Неделя занятия: при редактировании совпадает с `weekStartKey` карточки; при создании — текущая неделя просмотра или из ячейки. */
+  scheduleWeekStartKey: string;
+  /** При редактировании — id занятия, исключаемого из проверки */
+  excludeLessonId?: string | null;
   /** Группы того же курса, что выбран в фильтре админки */
   availableGroups: Group[];
   /** При создании — несколько групп; при редактировании — одна */
@@ -35,7 +42,9 @@ export default function LessonModal({
   onClose,
   onSubmit,
   initialData,
-  conflicts = { room: false, teacher: false },
+  lessons,
+  scheduleWeekStartKey,
+  excludeLessonId = null,
   availableGroups,
   allowMultipleGroups,
 }: LessonModalProps) {
@@ -55,6 +64,24 @@ export default function LessonModal({
     });
 
   const selectedGroupIds = watch('groupIds');
+  const dw = watch('dayOfWeek');
+  const ts = watch('timeSlot');
+  const tid = watch('teacherId');
+  const aid = watch('auditoriumId');
+
+  const conflicts = useMemo(() => {
+    if (!isOpen || !scheduleWeekStartKey) return { room: false, teacher: false };
+    const { roomConflict, teacherConflict } = hasConflict(
+      lessons,
+      Number(dw),
+      Number(ts),
+      excludeLessonId ?? undefined,
+      aid,
+      tid,
+      scheduleWeekStartKey,
+    );
+    return { room: !!roomConflict, teacher: !!teacherConflict };
+  }, [isOpen, lessons, dw, ts, tid, aid, scheduleWeekStartKey, excludeLessonId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -164,7 +191,11 @@ export default function LessonModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Доп. информация</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Дополнительная информация</label>
+            <p className="text-xs text-gray-500 mb-1.5 leading-snug">
+              Не дублируйте здесь предмет, преподавателя, аудиторию, день и пару — они уже отображаются в карточке.
+              Используйте полные формулировки (например: «чётная неделя», «нечётная неделя», «3-я подгруппа»).
+            </p>
             <textarea
               {...register('extraInfo')}
               rows={3}
@@ -265,16 +296,9 @@ export default function LessonModal({
                 {...register('timeSlot', { valueAsNumber: true })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
               >
-                {[
-                  '08:00-09:30',
-                  '09:45-11:15',
-                  '11:30-13:00',
-                  '13:30-15:00',
-                  '15:15-16:45',
-                  '17:00-18:30',
-                ].map((t, i) => (
+                {TIME_SLOTS.map((slot, i) => (
                   <option key={i} value={i}>
-                    {t}
+                    {slot.start}–{slot.end}
                   </option>
                 ))}
               </select>

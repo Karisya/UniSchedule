@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { GraduationCap, BookOpen, Settings } from 'lucide-react';
 
 export default function HomePage() {
@@ -69,10 +69,19 @@ export default function HomePage() {
             );
           })}
         </div>
+
+        <p className="mt-10 text-center text-sm text-gray-500">
+          <Link
+            to="/handbook"
+            className="text-indigo-600 hover:text-indigo-800 font-medium underline-offset-4 hover:underline"
+          >
+            Справочник кафедры: легенда графика и нагрузка по дисциплинам
+          </Link>
+        </p>
       </main>
 
       <footer className="py-4 text-center text-sm text-gray-500">
-        © 2026 UniSchedule — Система учебного расписания
+        © 2026 UniSchedule — Система учебного расписания · ФРКТ БГУ (демоданные)
       </footer>
     </div>
   );

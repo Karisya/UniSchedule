@@ -12,7 +12,16 @@ export interface User {
 
 export interface Teacher {
   id: string;
+  /** Краткая подпись (как в графике) */
   name: string;
+  /** По документу нагрузки; если отлично известно из PDF */
+  fullNameOfficial?: string;
+  /** Должность и учёное звание (как в описании кафедры) */
+  position?: string;
+  /** Ставка (1,0 / 0,5 …) */
+  rate?: number;
+  /** Плановые часы весеннего семестра по сводке кафедры (для шкалы «от плана» в админке) */
+  plannedHoursSpring?: number;
 }
 
 export interface Subject {
@@ -38,8 +47,8 @@ export interface Lesson {
   auditoriumId: string;
   groupId: string;
   type: LessonType;
-  dayOfWeek: number; // 0 = Monday
-  timeSlot: number; // 0-5
+  dayOfWeek: number; // 0 = Monday … 5 = Saturday
+  timeSlot: number; // индекс пары в TIME_SLOTS (0 …)
   /** Понедельник недели, к которой относится занятие (YYYY-MM-DD, локальное) */
   weekStartKey: string;
   progress?: number; // 0-100 для преподавателя
@@ -68,6 +77,7 @@ export const TIME_SLOTS = [
   { start: '13:30', end: '15:00' },
   { start: '15:15', end: '16:45' },
   { start: '17:00', end: '18:30' },
+  { start: '18:40', end: '20:10' },
 ];
 
 export const DAYS_OF_WEEK = [

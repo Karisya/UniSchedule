@@ -11,15 +11,17 @@ import {
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { addLesson, moveLesson, updateLesson, removeLesson } from '../store/scheduleSlice';
 import ScheduleHeader from '../components/ScheduleHeader';
+import SemanticSearchBar from '../components/SemanticSearchBar';
 import LessonCard from '../components/LessonCard';
 import LessonModal, { type LessonFormData } from '../components/LessonModal';
 import DeleteModal from '../components/DeleteModal';
 import ConflictModal from '../components/ConflictModal';
+import AdminWorkloadModal from '../components/AdminWorkloadModal';
+import { ScheduleWeekColGroup, ScheduleDayColGroup, ScheduleMonthColGroup } from '../components/ScheduleGridColGroups';
 import DroppableCell from '../components/DroppableCell';
 import type { Lesson } from '../types';
 import { TIME_SLOTS, DAYS_OF_WEEK } from '../types';
 import {
-  hasConflict,
   getSubjectName,
   getGroupName,
   getGroupCourse,
@@ -29,17 +31,31 @@ import {
   findScheduleConflicts,
   calendarDayToWeekdayIndex,
   getLessonTypeColors,
+  buildAdminTeacherWorkloadRows,
+  summarizeAdminTeacherWorkload,
+  sortLessonsForCellDisplay,
 } from '../utils/scheduleUtils';
 import { exportLessonsToExcel } from '../utils/exportExcel';
 import { Save, Copy } from 'lucide-react';
-import { groups, teachers, auditoriums } from '../store/mockData';
-import { dateToWeekStartKey, addWeeksToWeekStartKey, weekStartKeyToMondayDate } from '../utils/weekKeys';
+import { groups, teachers, auditoriums, SCHEDULE_COURSE_NUMBERS } from '../store/mockData';
+import {
+  dateToWeekStartKey,
+  addWeeksToWeekStartKey,
+  weekStartKeyToMondayDate,
+  deltaWeekStartsBetweenKeys,
+  formatLocalDateKey,
+  lessonCalendarDateKey,
+  formatAcademicWeekLine,
+} from '../utils/weekKeys';
+import { SEMESTER_WEEK1_MONDAY_KEY } from '../config/semester';
+import { useScheduleLessonFlash } from '../hooks/useScheduleLessonFlash';
 
 type ViewMode = 'day' | 'week' | 'month';
 
 function getTodayWeekdayIndex(): number {
   const day = new Date().getDay();
-  if (day === 0 || day === 6) return -1;
+  if (day === 0) return -1;
+  if (day === 6) return 5;
   return day - 1;
 }
 
@@ -72,6 +88,7 @@ export default function AdminSchedule() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [lessonToDelete, setLessonToDelete] = useState<Lesson | null>(null);
   const [conflictModalOpen, setConflictModalOpen] = useState(false);
+  const [workloadModalOpen, setWorkloadModalOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [selectedDay, setSelectedDay] = useState(0);
@@ -103,6 +120,31 @@ export default function AdminSchedule() {
   const weekDates = useMemo(() => getWeekDayDates(weekStart), [weekStart]);
   const todayIdx = getTodayWeekdayIndex();
   const isCurrentWeekNav = weekOffset === 0;
+
+  const academicWeekLine = useMemo(
+    () => formatAcademicWeekLine(viewWeekStartKey, SEMESTER_WEEK1_MONDAY_KEY),
+    [viewWeekStartKey],
+  );
+
+  const { flashLessonId, setFlashLessonId } = useScheduleLessonFlash();
+
+  const navigateToLessonFromSearch = useCallback(
+    (lesson: Lesson) => {
+      const dWin = deltaWeekStartsBetweenKeys(viewWeekStartKey, lesson.weekStartKey);
+      setWeekOffset((o) => o + dWin);
+      setViewMode('week');
+      setSelectedDay(lesson.dayOfWeek);
+      const g = groups.find((gr) => gr.id === lesson.groupId);
+      if (g) {
+        setFilterCourse(String(g.course));
+        setFilterGroup(lesson.groupId);
+      }
+      setFilterTeacher('all');
+      setFilterAuditorium('all');
+      setFlashLessonId(lesson.id);
+    },
+    [viewWeekStartKey, setFlashLessonId],
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -196,38 +238,72 @@ export default function AdminSchedule() {
     });
   }, [lessons, filtersReady, filterCourse, filterGroup, viewWeekStartKey]);
 
-  const getLessonAt = useCallback(
+  const getLessonsAt = useCallback(
     (day: number, slot: number) =>
-      filteredLessons.find((lt) => lt.dayOfWeek === day && lt.timeSlot === slot) ?? null,
+      sortLessonsForCellDisplay(
+        filteredLessons.filter((lt) => lt.dayOfWeek === day && lt.timeSlot === slot),
+      ),
     [filteredLessons]
   );
 
   const getConflictAt = useCallback(
     (day: number, slot: number) => {
+      const cellCal = formatLocalDateKey(weekDates[day]);
       const inSlot = lessons.filter(
-        (l) =>
-          l.weekStartKey === viewWeekStartKey &&
-          l.dayOfWeek === day &&
-          l.timeSlot === slot
+        (l) => lessonCalendarDateKey(l) === cellCal && l.timeSlot === slot
       );
-      return inSlot.length > 1;
+      if (inSlot.length < 2) return false;
+      const roomCounts = new Map<string, number>();
+      const teacherCounts = new Map<string, number>();
+      for (const l of inSlot) {
+        roomCounts.set(l.auditoriumId, (roomCounts.get(l.auditoriumId) ?? 0) + 1);
+        teacherCounts.set(l.teacherId, (teacherCounts.get(l.teacherId) ?? 0) + 1);
+      }
+      return [...roomCounts.values()].some((c) => c > 1) || [...teacherCounts.values()].some((c) => c > 1);
     },
-    [lessons, viewWeekStartKey]
+    [lessons, weekDates]
   );
 
-  const totalSlots = 5 * 6;
   const lessonsInViewWeek = useMemo(
     () => lessons.filter((l) => l.weekStartKey === viewWeekStartKey),
     [lessons, viewWeekStartKey]
   );
-  const filledCount = useMemo(() => {
-    const unique = new Set(lessonsInViewWeek.map((l) => `${l.dayOfWeek}-${l.timeSlot}`));
-    return unique.size;
-  }, [lessonsInViewWeek]);
-  const fillPercent = Math.round((filledCount / totalSlots) * 100);
+
+  /** Подсказка по часам только при фильтре «один преподаватель» — без полосы прогресса в шапке. */
+  const adminWorkloadNote = useMemo(() => {
+    const ACADEMIC_HOURS = 2;
+    if (!filtersReady || filterTeacher === 'all') return null;
+    const c = parseInt(filterCourse, 10);
+    const scoped = lessonsInViewWeek.filter((l) => {
+      const g = groups.find((gr) => gr.id === l.groupId);
+      if (g?.course !== c || l.groupId !== filterGroup) return false;
+      if (l.teacherId !== filterTeacher) return false;
+      if (filterAuditorium !== 'all' && l.auditoriumId !== filterAuditorium) return false;
+      return true;
+    });
+    const scheduledHours = scoped.length * ACADEMIC_HOURS;
+    const ph = teachers.find((t) => t.id === filterTeacher)?.plannedHoursSpring;
+    if (ph != null && ph > 0) {
+      return `Нагрузка в выборке: ${scheduledHours} ч из ${ph} ч по плану на весну (2 акад. ч на ячейку).`;
+    }
+    return `В выборке у преподавателя: ${scheduledHours} акад. ч по текущим фильтрам группы и аудитории.`;
+  }, [
+    lessonsInViewWeek,
+    filtersReady,
+    filterCourse,
+    filterGroup,
+    filterTeacher,
+    filterAuditorium,
+  ]);
 
   const conflictEntries = useMemo(() => findScheduleConflicts(lessons), [lessons]);
   const conflictsCount = conflictEntries.length;
+
+  const adminTeacherWorkloadRows = useMemo(() => buildAdminTeacherWorkloadRows(lessons), [lessons]);
+  const adminWorkloadSummary = useMemo(
+    () => summarizeAdminTeacherWorkload(adminTeacherWorkloadRows),
+    [adminTeacherWorkloadRows],
+  );
 
   const handleDragStart = (e: DragStartEvent) => setActiveId(String(e.active.id));
   const handleDragEnd = (e: DragEndEvent) => {
@@ -242,7 +318,7 @@ export default function AdminSchedule() {
     dispatch(moveLesson({ id: String(active.id), dayOfWeek, timeSlot }));
   };
 
-  const openAddModal = (prefill?: { dayOfWeek: number; timeSlot: number }) => {
+  const openAddModal = (prefill?: { dayOfWeek: number; timeSlot: number; weekStartKey?: string }) => {
     if (!filtersReady) return;
     setEditingLessonId(null);
     setPrefilledSlot(prefill ?? null);
@@ -358,35 +434,21 @@ export default function AdminSchedule() {
 
   const editingLesson = editingLessonId ? lessons.find((l) => l.id === editingLessonId) : null;
 
-  const conflictsForModal = useMemo(() => {
-    if (!editingLesson) return { room: false, teacher: false };
-    const wk = editingLesson.weekStartKey;
-    const { roomConflict, teacherConflict } = hasConflict(
-      lessons,
-      editingLesson.dayOfWeek,
-      editingLesson.timeSlot,
-      editingLesson.id,
-      editingLesson.auditoriumId,
-      editingLesson.teacherId,
-      wk
-    );
-    return { room: !!roomConflict, teacher: !!teacherConflict };
-  }, [editingLesson, lessons]);
-
   const renderWeekTable = () => (
-    <table className="w-full min-w-[800px] border-collapse">
+    <table className="table-fixed w-full min-w-[1200px] border-collapse">
+      <ScheduleWeekColGroup />
       <thead>
         <tr>
-          <th className="w-28 p-2 text-left text-sm font-medium text-gray-600 border-b border-r border-gray-200 bg-gray-50">
+          <th className="p-2 text-left text-sm font-medium text-gray-600 border-b border-r border-gray-200 bg-gray-50 min-w-0">
             Время
           </th>
-          {DAYS_OF_WEEK.slice(0, 5).map((day, i) => {
+          {DAYS_OF_WEEK.slice(0, 6).map((day, i) => {
             const d = weekDates[i];
             const isTodayCol = isCurrentWeekNav && todayIdx === i;
             return (
               <th
                 key={day}
-                className={`p-2 text-center text-sm font-medium border-b border-gray-200 ${
+                className={`p-2 text-center text-sm font-medium border-b border-gray-200 min-w-0 ${
                   isTodayCol ? 'bg-primary-100 text-primary-800 ring-2 ring-primary-300 ring-inset' : 'bg-gray-50 text-gray-600'
                 }`}
               >
@@ -402,20 +464,22 @@ export default function AdminSchedule() {
       <tbody>
         {TIME_SLOTS.map((slot, slotIdx) => (
           <tr key={slotIdx}>
-            <td className="p-2 text-sm text-gray-600 border-b border-r border-gray-200 align-top">
+            <td className="p-2 text-sm text-gray-600 border-b border-r border-gray-200 align-top min-w-0">
               {slot.start}–{slot.end}
             </td>
-            {DAYS_OF_WEEK.slice(0, 5).map((_, dayIdx) => (
+            {DAYS_OF_WEEK.slice(0, 6).map((_, dayIdx) => (
               <DroppableCell
                 key={dayIdx}
                 dayOfWeek={dayIdx}
                 timeSlot={slotIdx}
-                lesson={getLessonAt(dayIdx, slotIdx)}
+                lessons={getLessonsAt(dayIdx, slotIdx)}
                 isConflict={getConflictAt(dayIdx, slotIdx)}
                 onEdit={openEditModal}
                 onDelete={openDeleteModal}
-                onEmptyClick={(d, s) => openAddModal({ dayOfWeek: d, timeSlot: s })}
+                onEmptyClick={(d, s) => openAddModal({ dayOfWeek: d, timeSlot: s, weekStartKey: viewWeekStartKey })}
+                onAddAnother={(d, s) => openAddModal({ dayOfWeek: d, timeSlot: s, weekStartKey: viewWeekStartKey })}
                 scheduleReady={filtersReady}
+                flashLessonId={flashLessonId}
               />
             ))}
           </tr>
@@ -425,14 +489,15 @@ export default function AdminSchedule() {
   );
 
   const renderDayTable = () => (
-    <table className="w-full min-w-[400px] border-collapse">
+    <table className="table-fixed w-full min-w-[640px] border-collapse">
+      <ScheduleDayColGroup />
       <thead>
         <tr>
-          <th className="w-28 p-2 text-left text-sm font-medium text-gray-600 border-b border-r border-gray-200 bg-gray-50">
+          <th className="p-2 text-left text-sm font-medium text-gray-600 border-b border-r border-gray-200 bg-gray-50 min-w-0">
             Время
           </th>
           <th
-            className={`p-2 text-center text-sm font-medium border-b border-gray-200 ${
+            className={`p-2 text-center text-sm font-medium border-b border-gray-200 min-w-0 ${
               isCurrentWeekNav && todayIdx === selectedDay ? 'bg-primary-100 text-primary-800' : 'bg-gray-50 text-gray-600'
             }`}
           >
@@ -443,18 +508,24 @@ export default function AdminSchedule() {
       <tbody>
         {TIME_SLOTS.map((slot, slotIdx) => (
           <tr key={slotIdx}>
-            <td className="p-2 text-sm text-gray-600 border-b border-r border-gray-200 align-top">
+            <td className="p-2 text-sm text-gray-600 border-b border-r border-gray-200 align-top min-w-0">
               {slot.start}–{slot.end}
             </td>
             <DroppableCell
               dayOfWeek={selectedDay}
               timeSlot={slotIdx}
-              lesson={getLessonAt(selectedDay, slotIdx)}
+              lessons={getLessonsAt(selectedDay, slotIdx)}
               isConflict={getConflictAt(selectedDay, slotIdx)}
               onEdit={openEditModal}
               onDelete={openDeleteModal}
-              onEmptyClick={(_, s) => openAddModal({ dayOfWeek: selectedDay, timeSlot: s })}
+              onEmptyClick={(_, s) =>
+                openAddModal({ dayOfWeek: selectedDay, timeSlot: s, weekStartKey: viewWeekStartKey })
+              }
+              onAddAnother={(_, s) =>
+                openAddModal({ dayOfWeek: selectedDay, timeSlot: s, weekStartKey: viewWeekStartKey })
+              }
               scheduleReady={filtersReady}
+              flashLessonId={flashLessonId}
             />
           </tr>
         ))}
@@ -493,11 +564,15 @@ export default function AdminSchedule() {
           →
         </button>
       </div>
-      <table className="w-full border-collapse min-w-[900px]">
+      <table className="table-fixed w-full border-collapse min-w-[900px]">
+        <ScheduleMonthColGroup />
         <thead>
           <tr>
             {calLabels.map((l) => (
-              <th key={l} className="p-2 text-center text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-200">
+              <th
+                key={l}
+                className="p-2 text-center text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-200 min-w-0"
+              >
                 {l}
               </th>
             ))}
@@ -522,13 +597,13 @@ export default function AdminSchedule() {
                 return (
                   <td
                     key={di}
-                    className={`align-top border border-gray-200 p-1 min-h-[120px] w-[14%] ${
+                    className={`align-top border border-gray-200 p-1 min-w-0 h-[156px] min-h-[156px] max-h-[156px] overflow-hidden ${
                       !inMonth ? 'bg-gray-50 text-gray-400' : isWeekend ? 'bg-gray-100' : 'bg-white'
                     } ${isTodayCell ? 'ring-2 ring-primary-400 ring-inset' : ''}`}
                   >
-                    <div className="text-xs font-semibold mb-1">{cellDate.getDate()}</div>
+                    <div className="text-xs font-semibold mb-1 shrink-0">{cellDate.getDate()}</div>
                     {inMonth && !isWeekend && (
-                      <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                      <div className="space-y-1 overflow-y-auto overflow-x-hidden max-h-[120px] min-h-0">
                         {cellLessons.slice(0, 6).map((l) => {
                           const name = getSubjectName(l.subjectId);
                           const short = name.length > 20 ? `${name.slice(0, 20)}…` : name;
@@ -569,6 +644,7 @@ export default function AdminSchedule() {
         showNav
         isCurrentWeek={isCurrentWeekNav}
         weekRangeLabel={dateRangeStr}
+        academicWeekLine={academicWeekLine}
         onPrevWeek={() => setWeekOffset((o) => o - 1)}
         onNextWeek={() => setWeekOffset((o) => o + 1)}
         onCurrentWeek={() => {
@@ -576,6 +652,7 @@ export default function AdminSchedule() {
           const d = new Date();
           setMonthCursor(new Date(d.getFullYear(), d.getMonth(), 1));
         }}
+        toolbar={<SemanticSearchBar role="admin" onLessonNavigate={navigateToLessonFromSearch} />}
       />
 
       <div className="p-6">
@@ -617,13 +694,52 @@ export default function AdminSchedule() {
               Копировать на след. неделю
             </button>
           </div>
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">{fillPercent}% заполнено</span>
-              <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-green-500 rounded-full" style={{ width: `${fillPercent}%` }} />
+          <div className="flex items-center gap-6 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setWorkloadModalOpen(true)}
+              disabled={lessons.length === 0}
+              title="Разбивка по каждому преподавателю: занесено часов и план"
+              className={`flex flex-col items-end gap-0.5 text-left min-w-[200px] rounded-lg px-2 py-1.5 transition-colors ${
+                lessons.length === 0
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:bg-primary-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-1'
+              }`}
+            >
+              <span className="text-sm text-gray-700">
+                {adminWorkloadSummary.fillPercent != null ? (
+                  <>
+                    <span className="font-semibold text-gray-900">
+                      {adminWorkloadSummary.fillPercent}%
+                    </span>
+                    <span className="text-gray-500 font-normal">
+                      {' '}
+                      — {adminWorkloadSummary.sumScheduledScoped} / {adminWorkloadSummary.sumPlannedScoped}{' '}
+                      акад. ч
+                    </span>
+                  </>
+                ) : (
+                  <span>
+                    <span className="font-medium text-gray-800">
+                      {adminWorkloadSummary.totalScheduledHours}
+                    </span>
+                    <span className="text-gray-500"> акад. ч в расписании</span>
+                    <span className="block text-xs text-amber-700 mt-0.5">
+                      Сводный план не задан ни у одного преподавателя
+                    </span>
+                  </span>
+                )}
+              </span>
+              <span className="text-[11px] text-gray-500 w-full">Нагрузка преподавателей — подробнее</span>
+              <div className="w-full max-w-[200px] h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${adminWorkloadSummary.fillPercent != null && adminWorkloadSummary.fillPercent >= 100 ? 'bg-emerald-500' : 'bg-primary-500'}`}
+                  style={{
+                    width: `${adminWorkloadSummary.fillPercent != null ? adminWorkloadSummary.fillPercent : 0}%`,
+                  }}
+                />
               </div>
-            </div>
+            </button>
             <button
               type="button"
               onClick={() => conflictsCount > 0 && setConflictModalOpen(true)}
@@ -660,7 +776,7 @@ export default function AdminSchedule() {
 
           {viewMode === 'day' && (
             <div className="flex gap-2 flex-wrap">
-              {['Пн', 'Вт', 'Ср', 'Чт', 'Пт'].map((d, i) => (
+              {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'].map((d, i) => (
                 <button
                   key={d}
                   type="button"
@@ -687,7 +803,7 @@ export default function AdminSchedule() {
               className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
             >
               <option value="">Выберите курс</option>
-              {[1, 2, 3, 4].map((c) => (
+              {SCHEDULE_COURSE_NUMBERS.map((c) => (
                 <option key={c} value={c}>
                   {c} курс
                 </option>
@@ -738,6 +854,11 @@ export default function AdminSchedule() {
                 </option>
               ))}
             </select>
+            {adminWorkloadNote && (
+              <span className="text-xs text-gray-500 max-w-md leading-snug" title={adminWorkloadNote}>
+                {adminWorkloadNote}
+              </span>
+            )}
           </div>
         </div>
 
@@ -764,7 +885,7 @@ export default function AdminSchedule() {
             {activeId ? (() => {
               const lesson = lessons.find((l) => l.id === activeId);
               return lesson ? (
-                <div className="w-36">
+                <div className="w-52 min-w-[12rem] max-w-[14rem] pointer-events-none shadow-lg rounded-lg">
                   <LessonCard
                     lesson={lesson}
                     compact
@@ -805,7 +926,11 @@ export default function AdminSchedule() {
               ? { groupIds: [filterGroup] }
               : undefined
           }
-          conflicts={editingLesson ? conflictsForModal : { room: false, teacher: false }}
+          lessons={lessons}
+          scheduleWeekStartKey={
+            editingLesson?.weekStartKey ?? prefilledSlot?.weekStartKey ?? viewWeekStartKey
+          }
+          excludeLessonId={editingLessonId}
         />
 
         <DeleteModal
@@ -820,6 +945,15 @@ export default function AdminSchedule() {
           conflicts={conflictEntries}
           onClose={() => setConflictModalOpen(false)}
           onRemoveLesson={(id) => dispatch(removeLesson(id))}
+        />
+
+        <AdminWorkloadModal
+          isOpen={workloadModalOpen}
+          onClose={() => setWorkloadModalOpen(false)}
+          rows={adminTeacherWorkloadRows}
+          sumScheduledScoped={adminWorkloadSummary.sumScheduledScoped}
+          sumPlannedScoped={adminWorkloadSummary.sumPlannedScoped}
+          totalScheduledHours={adminWorkloadSummary.totalScheduledHours}
         />
       </div>
     </div>

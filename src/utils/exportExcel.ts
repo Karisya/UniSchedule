@@ -22,7 +22,7 @@ export function exportLessonsToExcel(lessons: Lesson[], filename = 'raspisanie.x
       'Аудитория',
       'Группа',
       'Тип',
-      'Доп. информация',
+      'Дополнительная информация',
     ],
   ];
   const sorted = [...lessons].sort((a, b) => {
