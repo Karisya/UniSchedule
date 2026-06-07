@@ -2,10 +2,11 @@ import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod/v3';
-import { subjects, teachers, auditoriums } from '../store/mockData';
+import { subjects, auditoriums } from '../store/mockData';
 import type { Group, Lesson } from '../types';
 import { TIME_SLOTS } from '../types';
 import { hasConflict } from '../utils/scheduleUtils';
+import { getTeachersForSubject, isTeacherValidForSubject } from '../data/subjectTeachers';
 
 const schema = z.object({
   subjectId: z.string().min(1, 'Выберите предмет'),
@@ -64,10 +65,24 @@ export default function LessonModal({
     });
 
   const selectedGroupIds = watch('groupIds');
+  const subjectId = watch('subjectId');
   const dw = watch('dayOfWeek');
   const ts = watch('timeSlot');
   const tid = watch('teacherId');
   const aid = watch('auditoriumId');
+
+  const teacherOptions = useMemo(
+    () => (subjectId ? getTeachersForSubject(subjectId) : []),
+    [subjectId],
+  );
+
+  useEffect(() => {
+    if (!isOpen || !subjectId) return;
+    const current = getValues('teacherId');
+    if (current && !isTeacherValidForSubject(current, subjectId)) {
+      setValue('teacherId', teacherOptions[0]?.id ?? '', { shouldValidate: true });
+    }
+  }, [isOpen, subjectId, teacherOptions, getValues, setValue]);
 
   const conflicts = useMemo(() => {
     if (!isOpen || !scheduleWeekStartKey) return { room: false, teacher: false };
@@ -154,12 +169,15 @@ export default function LessonModal({
             <label className="block text-sm font-medium text-gray-700 mb-1">Преподаватель</label>
             <select
               {...register('teacherId')}
-              className={`w-full border rounded-lg px-3 py-2 text-sm ${
+              disabled={!subjectId}
+              className={`w-full border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100 disabled:text-gray-500 ${
                 conflicts.teacher ? 'border-red-500 bg-red-50' : 'border-gray-300'
               }`}
             >
-              <option value="">Выберите преподавателя</option>
-              {teachers.map((t) => (
+              <option value="">
+                {subjectId ? 'Выберите преподавателя' : 'Сначала выберите предмет'}
+              </option>
+              {teacherOptions.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
                 </option>

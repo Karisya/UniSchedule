@@ -9,19 +9,19 @@ import type { UserRole } from '../types';
 const ROLE_CONFIG: Record<UserRole, { title: string; subtitle: string; icon: typeof GraduationCap; color: string }> = {
   student: {
     title: 'Студент',
-    subtitle: 'Войдите для просмотра расписания',
+    subtitle: 'Просмотр расписания вашей группы',
     icon: GraduationCap,
     color: 'text-blue-600',
   },
   teacher: {
     title: 'Преподаватель',
-    subtitle: 'Войдите для просмотра расписания',
+    subtitle: 'Расписание занятий и нагрузка',
     icon: BookOpen,
     color: 'text-green-600',
   },
   administrator: {
     title: 'Администратор',
-    subtitle: 'Войдите для управления расписанием',
+    subtitle: 'Управление учебным расписанием',
     icon: Settings,
     color: 'text-purple-600',
   },
@@ -41,8 +41,7 @@ export default function LoginPage() {
       return;
     }
     const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (user) setDetectedRole(user.role);
-    else setDetectedRole(null);
+    setDetectedRole(user?.role ?? null);
   }, []);
 
   const handleLoginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,20 +62,30 @@ export default function LoginPage() {
       setError('Неверный пароль');
       return;
     }
-    dispatch(loginAs({
-      role: user.role,
-      groupId: user.groupId,
-      teacherId: user.teacherId,
-    }));
+    dispatch(
+      loginAs({
+        role: user.role,
+        groupId: user.groupId,
+        teacherId: user.teacherId,
+      }),
+    );
     if (user.role === 'student') navigate('/student');
     else if (user.role === 'teacher') navigate('/teacher');
     else navigate('/admin');
   };
 
-  // Роль показываем ТОЛЬКО после определения по email (сверка с БД)
   const displayRole: UserRole | null = detectedRole;
-  const config = displayRole ? ROLE_CONFIG[displayRole as UserRole] : null;
+  const config = displayRole ? ROLE_CONFIG[displayRole] : null;
   const Icon = config?.icon ?? GraduationCap;
+
+  const submitClass =
+    displayRole === 'administrator'
+      ? 'bg-purple-600 hover:bg-purple-700'
+      : displayRole === 'teacher'
+        ? 'bg-green-600 hover:bg-green-700'
+        : displayRole === 'student'
+          ? 'bg-blue-600 hover:bg-blue-700'
+          : 'bg-primary-600 hover:bg-primary-700';
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -88,24 +97,21 @@ export default function LoginPage() {
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-12">
-        <Link
-          to="/"
-          className="text-sm text-gray-600 hover:text-gray-900 mb-6 flex items-center gap-1"
-        >
-          ← Выбор роли
-        </Link>
-
         <div className="w-full max-w-md bg-white rounded-xl shadow-md border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-              <Icon className={`w-6 h-6 ${config?.color ?? 'text-gray-600'}`} />
+            <div
+              className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+                config ? 'bg-gray-100' : 'bg-gray-50'
+              }`}
+            >
+              <Icon className={`w-6 h-6 ${config?.color ?? 'text-gray-500'}`} />
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900">
                 {config ? config.title : 'Вход в систему'}
               </h1>
               <p className="text-sm text-gray-500">
-                {config ? config.subtitle : 'Введите логин для определения роли'}
+                {config ? config.subtitle : 'Введите email — роль определится автоматически'}
               </p>
             </div>
           </div>
@@ -127,7 +133,10 @@ export default function LoginPage() {
               <input
                 type="password"
                 value={password}
-                onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError('');
+                }}
                 placeholder="Введите пароль"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
@@ -135,15 +144,20 @@ export default function LoginPage() {
             {error && <p className="text-red-500 text-sm">{error}</p>}
             <button
               type="submit"
-              className={`w-full py-2.5 rounded-lg font-medium text-white flex items-center justify-center gap-2 ${
-                displayRole === 'administrator' ? 'bg-purple-600 hover:bg-purple-700' :
-                displayRole === 'teacher' ? 'bg-green-600 hover:bg-green-700' :
-                'bg-blue-600 hover:bg-blue-700'
-              }`}
+              className={`w-full py-2.5 rounded-lg font-medium text-white flex items-center justify-center gap-2 transition-colors ${submitClass}`}
             >
-              Продолжить →
+              Войти →
             </button>
           </form>
+
+          <p className="mt-6 text-center text-xs text-gray-500">
+            <Link
+              to="/handbook"
+              className="text-indigo-600 hover:text-indigo-800 font-medium underline-offset-4 hover:underline"
+            >
+              Справочник кафедры
+            </Link>
+          </p>
         </div>
       </main>
 

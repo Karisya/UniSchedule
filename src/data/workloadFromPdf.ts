@@ -18,10 +18,10 @@ export const CATALOG_PLAN_ROWS: CatalogPlanRow[] = [
     totalHoursListed: 592.9,
   },
   {
-    discipline: 'Теория колебаний и волн',
+    discipline: 'ПЭД и СРиТИ (лабораторные)',
     direction: 'РФ и КТ',
-    specialization: 'Беленькая С.С. — ТКиВ по сводке',
-    totalHoursListed: 197,
+    specialization: 'Беленькая С.С. — ПЭД (3 пг, ауд. 45) и СРиТИ (ауд. 56)',
+    totalHoursListed: 198,
   },
   {
     discipline: 'Цифровая обработка сигналов',
@@ -47,14 +47,19 @@ export interface TeacherWorkloadRowParsed {
 
 export const TEACHER_WORKLOAD_FROM_PLAN: TeacherWorkloadRowParsed[] = [
   { teacherId: '1', discipline: 'Прикладная электродинамика (ПЭД)', semesterTotalHours: 592.9 },
-  { teacherId: '2', discipline: 'Теория колебаний и волн (ТКиВ)', semesterTotalHours: 197 },
-  { teacherId: '2', discipline: 'Кураторский час', note: '3к 1РФ', semesterTotalHours: undefined },
   {
     teacherId: '2',
-    discipline: 'Прикладная электродинамика',
-    note: 'лабораторные 3-й подгруппы совместно с Демидчиком В.И.',
+    discipline: 'Прикладная электродинамика (ПЭД)',
+    note: 'лабораторные 3-й подгруппы, ауд. 45',
     semesterTotalHours: undefined,
   },
+  {
+    teacherId: '2',
+    discipline: 'Статистическая радиофизика и теория информации (СРиТИ)',
+    note: 'лаб. 1РФ 3пг, 2РФ (ауд. 56) по графику',
+    semesterTotalHours: undefined,
+  },
+  { teacherId: '2', discipline: 'Кураторский час', note: '3к 1РФ', semesterTotalHours: undefined },
   { teacherId: '3', discipline: 'Обеспечение связи в системах Интернета вещей (ОСвСИВ)', semesterTotalHours: 51.2 },
   { teacherId: '4', discipline: 'Цифровая обработка сигналов (ЦОС)', semesterTotalHours: 715.6 },
   {
