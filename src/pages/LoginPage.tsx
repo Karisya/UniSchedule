@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { GraduationCap, BookOpen, Settings } from 'lucide-react';
 import { useAppDispatch } from '../store/hooks';
 import { loginAs } from '../store/userSlice';

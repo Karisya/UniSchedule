@@ -66,5 +66,5 @@ export function formatAcademicWeekLine(
   const n = academicWeekNumber1Based(viewWeekStartKey, semesterFirstMondayKey);
   const parity = academicWeekParityRu(n);
   if (parity === 'нечётная') return 'Нечётная';
-  return 'Чёрная';
+  return 'Чётная';
 }
