@@ -269,24 +269,12 @@ export default function AdminSchedule() {
     [lessons, viewWeekStartKey]
   );
 
-  /** Подсказка по часам только при фильтре «один преподаватель» — без полосы прогресса в шапке. */
-  const adminWorkloadNote = useMemo(() => {
-    const ACADEMIC_HOURS = 2;
-    if (!filtersReady || filterTeacher === 'all') return null;
-    const c = parseInt(filterCourse, 10);
-    const scoped = lessonsInViewWeek.filter((l) => {
-      const g = groups.find((gr) => gr.id === l.groupId);
-      if (g?.course !== c || l.groupId !== filterGroup) return false;
-      if (l.teacherId !== filterTeacher) return false;
-      if (filterAuditorium !== 'all' && l.auditoriumId !== filterAuditorium) return false;
-      return true;
-    });
-    const scheduledHours = scoped.length * ACADEMIC_HOURS;
+  const adminWorkloadNote = useMemo(() => {   
     const ph = teachers.find((t) => t.id === filterTeacher)?.plannedHoursSpring;
     if (ph != null && ph > 0) {
-      return `Нагрузка в выборке: ${scheduledHours} ч из ${ph} ч по плану на весну (2 акад. ч на ячейку).`;
+      return ``;
     }
-    return `В выборке у преподавателя: ${scheduledHours} акад. ч по текущим фильтрам группы и аудитории.`;
+    return ``;
   }, [
     lessonsInViewWeek,
     filtersReady,
@@ -708,16 +696,9 @@ export default function AdminSchedule() {
             >
               <span className="text-sm text-gray-700">
                 {adminWorkloadSummary.fillPercent != null ? (
-                  <>
                     <span className="font-semibold text-gray-900">
                       {adminWorkloadSummary.fillPercent}%
                     </span>
-                    <span className="text-gray-500 font-normal">
-                      {' '}
-                      — {adminWorkloadSummary.sumScheduledScoped} / {adminWorkloadSummary.sumPlannedScoped}{' '}
-                      акад. ч
-                    </span>
-                  </>
                 ) : (
                   <span>
                     <span className="font-medium text-gray-800">

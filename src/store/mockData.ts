@@ -170,9 +170,9 @@ export const groups: Group[] = [
 export const SCHEDULE_COURSE_NUMBERS = [...new Set(groups.map((g) => g.course))].sort((a, b) => a - b);
 
 export const users: DbUser[] = [
-  { email: 'student@uni.ru', password: 'student', role: 'student', groupId: 'g3-1rf' },
-  { email: 'teacher@uni.ru', password: 'teacher', role: 'teacher', teacherId: '1' },
-  { email: 'admin@uni.ru', password: 'admin', role: 'administrator' },
+  { email: 'student@uni', password: 'student', role: 'student', groupId: 'g3-1rf' },
+  { email: 'teacher@uni', password: 'teacher', role: 'teacher', teacherId: '1' },
+  { email: 'admin@uni', password: 'admin', role: 'administrator' },
 ];
 
 /** Расписание текущей недели по «Графику работы весна 2026» (сетка + ауд. 41–56). */

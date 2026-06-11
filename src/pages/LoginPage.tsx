@@ -149,15 +149,6 @@ export default function LoginPage() {
               Войти →
             </button>
           </form>
-
-          <p className="mt-6 text-center text-xs text-gray-500">
-            <Link
-              to="/handbook"
-              className="text-indigo-600 hover:text-indigo-800 font-medium underline-offset-4 hover:underline"
-            >
-              Справочник кафедры
-            </Link>
-          </p>
         </div>
       </main>
 
